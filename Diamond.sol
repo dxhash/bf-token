@@ -3,13 +3,14 @@ pragma solidity ^0.8.0;
 
 import {LibDiamond} from "./libraries/LibDiamond.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
-import {AppStorage} from "./libraries/LibAppStorage.sol";
 
 contract Diamond {
-    AppStorage internal s;
-
-    constructor(address _contractOwner, address _diamondCutFacet) payable {
-        LibDiamond.setContractOwner(_contractOwner);
+    constructor(
+        address[] memory _contractOwners,
+        uint8 _threshold,
+        address _diamondCutFacet
+    ) payable {
+        LibDiamond.setContractOwners(_contractOwners, _threshold);
 
         IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](1);
         bytes4[] memory functionSelectors = new bytes4[](1);

@@ -15,6 +15,9 @@ interface IDiamondCut {
     }
 
     function diamondCut(
+        uint8[] memory _sigV,
+        bytes32[] memory _sigR,
+        bytes32[] memory _sigS,
         FacetCut[] calldata _diamondCut,
         address _init,
         bytes calldata _calldata

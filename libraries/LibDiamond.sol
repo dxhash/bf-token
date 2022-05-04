@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
+import {EIP712} from "./EIP712.sol";
 
 library LibDiamond {
     bytes32 constant DIAMOND_STORAGE_POSITION =
@@ -11,8 +12,12 @@ library LibDiamond {
         mapping(bytes4 => bytes32) facets;
         mapping(uint256 => bytes32) selectorSlots;
         uint16 selectorCount;
+        uint8 threshold;
+        uint256 configNonce;
+        bytes32 domainSeparator;
         mapping(bytes4 => bool) supportedInterfaces;
-        address contractOwner;
+        address[] contractOwners;
+        mapping(address => bool) isOwner;
     }
 
     function diamondStorage()
@@ -27,27 +32,98 @@ library LibDiamond {
     }
 
     event OwnershipTransferred(
-        address indexed previousOwner,
-        address indexed newOwner
+        address[] indexed previousOwners,
+        address[] indexed newOwners
     );
 
-    function setContractOwner(address _newOwner) internal {
+    function setContractOwners(address[] memory _newOwners, uint8 _threshold)
+        internal
+    {
         DiamondStorage storage ds = diamondStorage();
-        address previousOwner = ds.contractOwner;
-        ds.contractOwner = _newOwner;
-        emit OwnershipTransferred(previousOwner, _newOwner);
+        address[] memory previousOwners = ds.contractOwners;
+
+        address lastAdd = address(0);
+        for (uint256 i = 0; i < _newOwners.length; i++) {
+            require(_newOwners[i] > lastAdd);
+            lastAdd = _newOwners[i];
+        }
+
+        require(_threshold <= _newOwners.length && _threshold > 0);
+
+        for (uint256 i = 0; i < previousOwners.length; i++) {
+            delete ds.isOwner[previousOwners[i]];
+        }
+
+        for (uint256 i = 0; i < _newOwners.length; i++) {
+            ds.isOwner[_newOwners[i]] = true;
+        }
+
+        ds.contractOwners = _newOwners;
+        ds.threshold = _threshold;
+
+        emit OwnershipTransferred(previousOwners, _newOwners);
     }
 
-    function contractOwner() internal view returns (address contractOwner_) {
-        contractOwner_ = diamondStorage().contractOwner;
+    function threshold() internal view returns (uint8 threshold_) {
+        threshold_ = diamondStorage().threshold;
     }
 
+    function configNonce() internal view returns (uint256 configNonce_) {
+        configNonce_ = diamondStorage().configNonce;
+    }
+
+    function domainSeparator()
+        internal
+        view
+        returns (bytes32 domainSeparator_)
+    {
+        domainSeparator_ = diamondStorage().domainSeparator;
+    }
+
+    function contractOwners()
+        public
+        view
+        returns (address[] memory contractOwners_)
+    {
+        contractOwners_ = diamondStorage().contractOwners;
+    }
+
+    function verifySignature(
+        uint8[] memory sigV,
+        bytes32[] memory sigR,
+        bytes32[] memory sigS,
+        bytes memory data
+    ) internal returns (bool verified_) {
+        DiamondStorage storage ds = diamondStorage();
+
+        address lastAdd = address(0);
+        for (uint256 i = 0; i < ds.threshold; i++) {
+            address recovered = EIP712.recover(
+                ds.domainSeparator,
+                sigV[i],
+                sigR[i],
+                sigS[i],
+                data
+            );
+            require(
+                recovered > lastAdd && ds.isOwner[recovered],
+                "Invalid Signature"
+            );
+            lastAdd = recovered;
+        }
+
+        ds.configNonce = ds.configNonce + 1;
+        verified_ = true;
+    }
+
+    /*
     function enforceIsContractOwner() internal view {
         require(
             msg.sender == diamondStorage().contractOwner,
             "Must be contract owner"
         );
     }
+    */
 
     event DiamondCut(
         IDiamondCut.FacetCut[] _diamondCut,
