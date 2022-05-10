@@ -5,13 +5,8 @@ import {LibDiamond} from "./libraries/LibDiamond.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 
 contract Diamond {
-    constructor(
-        address[] memory _contractOwners,
-        uint8 _threshold,
-        address _diamondCutFacet
-    ) payable {
-        LibDiamond.setContractOwners(_contractOwners, _threshold);
-
+    constructor(address _contractOwner, address _diamondCutFacet) payable {
+        LibDiamond.setContractOwner(_contractOwner);
         IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](1);
         bytes4[] memory functionSelectors = new bytes4[](1);
         functionSelectors[0] = IDiamondCut.diamondCut.selector;

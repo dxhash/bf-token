@@ -25,6 +25,9 @@ contract TokenFacet is IERC20 {
     event MinterConfigured(address indexed minter, uint256 minterAllowedAmount);
     event MinterRemoved(address indexed oldMinter);
 
+    bytes32 internal constant _DOMAIN_SEPARATOR =
+        0xf235a3a1324700fca428abea7e3ccf9edb374d9c399878216a0ef4af02815cde;
+
     /* keccak256("Permit(address _owner,address _spender,uint256 _value,uint256 _nonce,uint256 _deadline)") */
     bytes32 internal constant _PERMIT_TYPEHASH =
         0x283ef5f1323e8965c0333bc5843eb0b8d7ffe23b9c2eab15c3e3ffcc75ae8134;
@@ -51,6 +54,10 @@ contract TokenFacet is IERC20 {
 
     function decimals() external view returns (uint8 decimals_) {
         decimals_ = s.decimals;
+    }
+
+    function DOMAIN_SEPARATOR() external pure returns (bytes32 ds_) {
+        ds_ = _DOMAIN_SEPARATOR;
     }
 
     function PERMIT_TYPEHASH() external pure returns (bytes32 pth_) {
@@ -88,23 +95,10 @@ contract TokenFacet is IERC20 {
     function setup(
         string memory _name,
         string memory _symbol,
-        uint8 _decimals,
-        uint8[] memory _sigV,
-        bytes32[] memory _sigR,
-        bytes32[] memory _sigS
+        uint8 _decimals
     ) external {
         require(!_initialized);
-
-        bytes memory data = abi.encode(
-            /* keccak256("setup(string memory _name, string memory _symbol, uint8 _decimals)") */
-            0x51a2bedc1562aee1534c78539fe723856c03df65743a62d6c4c4846832e3c862,
-            _name,
-            _symbol,
-            _decimals,
-            LibDiamond.configNonce()
-        );
-
-        LibDiamond.verifySignature(_sigV, _sigR, _sigS, data);
+        LibDiamond.enforceIsContractOwner();
 
         s.name = _name;
         s.symbol = _symbol;
@@ -244,22 +238,12 @@ contract TokenFacet is IERC20 {
         emit Transfer(_from, _to, _value);
     }
 
-    function configureMinter(
-        address _minter,
-        uint256 _minterAllowedAmount,
-        uint8[] memory _sigV,
-        bytes32[] memory _sigR,
-        bytes32[] memory _sigS
-    ) external whenNotPaused returns (bool) {
-        bytes memory data = abi.encode(
-            /* keccak256("configureMinter(address _minter, uint256 _minterAllowedAmount)") */
-            0xfb07eab7876ee8bf1e34912fcc5565e508ad409816590c97cc6066de797e7782,
-            _minter,
-            _minterAllowedAmount,
-            LibDiamond.configNonce()
-        );
-
-        LibDiamond.verifySignature(_sigV, _sigR, _sigS, data);
+    function configureMinter(address _minter, uint256 _minterAllowedAmount)
+        external
+        whenNotPaused
+        returns (bool)
+    {
+        LibDiamond.enforceIsContractOwner();
 
         s.minters[_minter] = true;
         s.minterAllowed[_minter] = _minterAllowedAmount;
@@ -267,20 +251,8 @@ contract TokenFacet is IERC20 {
         return true;
     }
 
-    function removeMinter(
-        address _minter,
-        uint8[] memory _sigV,
-        bytes32[] memory _sigR,
-        bytes32[] memory _sigS
-    ) external returns (bool) {
-        bytes memory data = abi.encode(
-            /* keccak256("removeMinter(address _minter)") */
-            0xb35670b45083259ff8fcf0c8be2c81d0e0ab8d77b9983a6eda5f3895a12f82d0,
-            _minter,
-            LibDiamond.configNonce()
-        );
-
-        LibDiamond.verifySignature(_sigV, _sigR, _sigS, data);
+    function removeMinter(address _minter) external returns (bool) {
+        LibDiamond.enforceIsContractOwner();
 
         s.minters[_minter] = false;
         s.minterAllowed[_minter] = 0;
@@ -435,8 +407,7 @@ contract TokenFacet is IERC20 {
             _deadline
         );
         require(
-            EIP712.recover(LibDiamond.domainSeparator(), _v, _r, _s, data) ==
-                _owner,
+            EIP712.recover(_DOMAIN_SEPARATOR, _v, _r, _s, data) == _owner,
             "Invalid signature"
         );
 
@@ -482,8 +453,7 @@ contract TokenFacet is IERC20 {
             _nonce
         );
         require(
-            EIP712.recover(LibDiamond.domainSeparator(), _v, _r, _s, data) ==
-                _from,
+            EIP712.recover(_DOMAIN_SEPARATOR, _v, _r, _s, data) == _from,
             "Invalid signature"
         );
 
@@ -515,8 +485,7 @@ contract TokenFacet is IERC20 {
             _nonce
         );
         require(
-            EIP712.recover(LibDiamond.domainSeparator(), _v, _r, _s, data) ==
-                _from,
+            EIP712.recover(_DOMAIN_SEPARATOR, _v, _r, _s, data) == _from,
             "Invalid signature"
         );
 
@@ -539,8 +508,7 @@ contract TokenFacet is IERC20 {
             _nonce
         );
         require(
-            EIP712.recover(LibDiamond.domainSeparator(), _v, _r, _s, data) ==
-                _authorizer,
+            EIP712.recover(_DOMAIN_SEPARATOR, _v, _r, _s, data) == _authorizer,
             "Invalid signature"
         );
 
@@ -594,22 +562,10 @@ contract TokenFacet is IERC20 {
         _tokenContract.safeTransfer(_to, _amount);
     }
 
-    function updateRescuer(
-        address _newRescuer,
-        uint8[] memory _sigV,
-        bytes32[] memory _sigR,
-        bytes32[] memory _sigS
-    ) external {
+    function updateRescuer(address _newRescuer) external {
         require(_newRescuer != address(0), "New rescuer is the zero address");
 
-        bytes memory data = abi.encode(
-            /* keccak256("updateRescuer(address _newRescuer)") */
-            0xd8c92999b7bb6daf516ed072fb0887e790e1faf54a95e77cd2932a318ebe01ee,
-            _newRescuer,
-            LibDiamond.configNonce()
-        );
-
-        LibDiamond.verifySignature(_sigV, _sigR, _sigS, data);
+        LibDiamond.enforceIsContractOwner();
 
         s.rescuer = _newRescuer;
         emit RescuerChanged(s.rescuer);
@@ -639,22 +595,10 @@ contract TokenFacet is IERC20 {
         emit Unpause();
     }
 
-    function updatePauser(
-        address _newPauser,
-        uint8[] memory _sigV,
-        bytes32[] memory _sigR,
-        bytes32[] memory _sigS
-    ) external {
+    function updatePauser(address _newPauser) external {
         require(_newPauser != address(0), "New pauser is the zero address");
 
-        bytes memory data = abi.encode(
-            /* keccak256("updatePauser(address _newPauser)") */
-            0x9efeb16ed5a35ebbfc5ebafc3a7781b210708393cbbb88c85c54cf781016fcfe,
-            _newPauser,
-            LibDiamond.configNonce()
-        );
-
-        LibDiamond.verifySignature(_sigV, _sigR, _sigS, data);
+        LibDiamond.enforceIsContractOwner();
 
         s.pauser = _newPauser;
         emit PauserChanged(s.pauser);
@@ -688,23 +632,14 @@ contract TokenFacet is IERC20 {
         emit UnBlacklisted(_account);
     }
 
-    function updateBlacklister(
-        address _newBlacklister,
-        uint8[] memory _sigV,
-        bytes32[] memory _sigR,
-        bytes32[] memory _sigS
-    ) external {
+    function updateBlacklister(address _newBlacklister) external {
         require(
             _newBlacklister != address(0),
             "New blacklister is the zero address"
         );
-        bytes memory data = abi.encode(
-            0xb4fa77fa651e39fcdfff636505690262a48b1b6c279bd8571861fda1def16402,
-            _newBlacklister,
-            LibDiamond.configNonce()
-        );
 
-        LibDiamond.verifySignature(_sigV, _sigR, _sigS, data);
+        LibDiamond.enforceIsContractOwner();
+
         s.blacklister = _newBlacklister;
         emit BlacklisterChanged(s.blacklister);
     }
