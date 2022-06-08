@@ -1,1 +1,7 @@
-.pre-commit-config.yaml
+__pycache__
+.env
+.history
+.hypothesis/
+build/
+reports/
+.pytest_cache

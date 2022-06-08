@@ -9,12 +9,21 @@ library LibDiamond {
         keccak256("diamond.standard.diamond.storage");
 
     struct DiamondStorage {
+        // maps function selectors to the facets that execute the functions.
+        // and maps the selectors to their position in the selectorSlots array.
+        // func selector => address facet, selector position
         mapping(bytes4 => bytes32) facets;
+        // array of slots of function selectors.
+        // each slot holds 8 function selectors.
         mapping(uint256 => bytes32) selectorSlots;
+        // The number of function selectors in selectorSlots
+        // Prevent adding more selectors than uint16:MAX
         uint16 selectorCount;
+        // Used to query if a contract implements an interface.
+        // Used to implement ERC-165.
         mapping(bytes4 => bool) supportedInterfaces;
+        // owner of the contract
         address contractOwner;
-        mapping(address => bool) isOwner;
     }
 
     function diamondStorage()
@@ -61,6 +70,13 @@ library LibDiamond {
         bytes32(uint256(0xffffffffffffffffffffffff));
     bytes32 constant CLEAR_SELECTOR_MASK = bytes32(uint256(0xffffffff << 224));
 
+    // Internal function version of diamondCut
+    // This code is almost the same as the external diamondCut,
+    // except it is using 'Facet[] memory _diamondCut' instead of
+    // 'Facet[] calldata _diamondCut'.
+    // The code is duplicated to prevent copying calldata to memory which
+    // causes an error for a two dimensional array.
+
     function diamondCut(
         IDiamondCut.FacetCut[] memory _diamondCut,
         address _init,
@@ -70,7 +86,11 @@ library LibDiamond {
         uint256 originalSelectorCount = ds.selectorCount;
         uint256 selectorCount = originalSelectorCount;
         bytes32 selectorSlot;
+        // Check if last selector slot is not full
+        // "selectorCount & 7" is a gas efficient modulo by eight "selectorCount % 8"
         if (selectorCount & 7 > 0) {
+            // get last selectorSlot
+            // "selectorSlot >> 3" is a gas efficient division by 8 "selectorSlot / 8"
             selectorSlot = ds.selectorSlots[selectorCount >> 3];
         }
         // loop through diamond cut
@@ -90,6 +110,8 @@ library LibDiamond {
         if (selectorCount != originalSelectorCount) {
             ds.selectorCount = uint16(selectorCount);
         }
+        // If last selector slot is not full
+        // "selectorCount & 7" is a gas efficient modulo by eight "selectorCount % 8"
         if (selectorCount & 7 > 0) {
             ds.selectorSlots[selectorCount >> 3] = selectorSlot;
         }
@@ -119,15 +141,20 @@ library LibDiamond {
                     address(bytes20(oldFacet)) == address(0),
                     "Can't add function that already exists"
                 );
+                // add facet for selector
                 ds.facets[selector] =
                     bytes20(_newFacetAddress) |
                     bytes32(_selectorCount);
+                // "_selectorCount & 7" is a gas efficient modulo by eight "_selectorCount % 8"
                 uint256 selectorInSlotPosition = (_selectorCount & 7) << 5;
+                // clear selector position in slot and add selector
                 _selectorSlot =
                     (_selectorSlot &
                         ~(CLEAR_SELECTOR_MASK >> selectorInSlotPosition)) |
                     (bytes32(selector) >> selectorInSlotPosition);
+                // if slot is full then write it to storage
                 if (selectorInSlotPosition == 224) {
+                    // "_selectorSlot >> 3" is a gas efficient division by 8 "_selectorSlot / 8"
                     ds.selectorSlots[_selectorCount >> 3] = _selectorSlot;
                     _selectorSlot = 0;
                 }
@@ -146,6 +173,7 @@ library LibDiamond {
                 bytes4 selector = _selectors[selectorIndex];
                 bytes32 oldFacet = ds.facets[selector];
                 address oldFacetAddress = address(bytes20(oldFacet));
+                // only useful if immutable functions exist
                 require(
                     oldFacetAddress != address(this),
                     "Can't replace immutable function"
@@ -158,6 +186,7 @@ library LibDiamond {
                     oldFacetAddress != address(0),
                     "Can't replace function that doesn't exist"
                 );
+                // replace old facet address
                 ds.facets[selector] =
                     (oldFacet & CLEAR_ADDRESS_MASK) |
                     bytes20(_newFacetAddress);
@@ -167,7 +196,9 @@ library LibDiamond {
                 _newFacetAddress == address(0),
                 "Remove facet address must be address(0)"
             );
+            // "_selectorCount >> 3" is a gas efficient division by 8 "_selectorCount / 8"
             uint256 selectorSlotCount = _selectorCount >> 3;
+            // "_selectorCount & 7" is a gas efficient modulo by eight "_selectorCount % 8"
             uint256 selectorInSlotIndex = _selectorCount & 7;
             for (
                 uint256 selectorIndex;
@@ -175,6 +206,7 @@ library LibDiamond {
                 selectorIndex++
             ) {
                 if (_selectorSlot == 0) {
+                    // get last selectorSlot
                     selectorSlotCount--;
                     _selectorSlot = ds.selectorSlots[selectorSlotCount];
                     selectorInSlotIndex = 7;
@@ -184,6 +216,7 @@ library LibDiamond {
                 bytes4 lastSelector;
                 uint256 oldSelectorsSlotCount;
                 uint256 oldSelectorInSlotPosition;
+                // adding a block here prevents stack too deep error
                 {
                     bytes4 selector = _selectors[selectorIndex];
                     bytes32 oldFacet = ds.facets[selector];
@@ -191,34 +224,43 @@ library LibDiamond {
                         address(bytes20(oldFacet)) != address(0),
                         "Can't remove function that doesn't exist"
                     );
+                    // only useful if immutable functions exist
                     require(
                         address(bytes20(oldFacet)) != address(this),
                         "Can't remove immutable function"
                     );
+                    // replace selector with last selector in ds.facets
+                    // gets the last selector
                     lastSelector = bytes4(
                         _selectorSlot << (selectorInSlotIndex << 5)
                     );
                     if (lastSelector != selector) {
+                        // update last selector slot position info
                         ds.facets[lastSelector] =
                             (oldFacet & CLEAR_ADDRESS_MASK) |
                             bytes20(ds.facets[lastSelector]);
                     }
                     delete ds.facets[selector];
                     uint256 oldSelectorCount = uint16(uint256(oldFacet));
+                    // "oldSelectorCount >> 3" is a gas efficient division by 8 "oldSelectorCount / 8"
                     oldSelectorsSlotCount = oldSelectorCount >> 3;
+                    // "oldSelectorCount & 7" is a gas efficient modulo by eight "oldSelectorCount % 8"
                     oldSelectorInSlotPosition = (oldSelectorCount & 7) << 5;
                 }
                 if (oldSelectorsSlotCount != selectorSlotCount) {
                     bytes32 oldSelectorSlot = ds.selectorSlots[
                         oldSelectorsSlotCount
                     ];
+                    // clears the selector we are deleting and puts the last selector in its place.
                     oldSelectorSlot =
                         (oldSelectorSlot &
                             ~(CLEAR_SELECTOR_MASK >>
                                 oldSelectorInSlotPosition)) |
                         (bytes32(lastSelector) >> oldSelectorInSlotPosition);
+                    // update storage with the modified slot
                     ds.selectorSlots[oldSelectorsSlotCount] = oldSelectorSlot;
                 } else {
+                    // clears the selector we are deleting and puts the last selector in its place.
                     _selectorSlot =
                         (_selectorSlot &
                             ~(CLEAR_SELECTOR_MASK >>
@@ -256,6 +298,7 @@ library LibDiamond {
             (bool success, bytes memory error) = _init.delegatecall(_calldata);
             if (!success) {
                 if (error.length > 0) {
+                    // bubble up the error
                     revert(string(error));
                 } else {
                     revert("_init function reverted");

@@ -6,12 +6,25 @@ import {IDiamondLoupe} from "../interfaces/IDiamondLoupe.sol";
 import {IERC165} from "../interfaces/IERC165.sol";
 
 contract DiamondLoupeFacet is IDiamondLoupe, IERC165 {
+    /**
+     * @dev These functions are expected to be called frequently by tools.
+     *
+     * struct Facet {
+     *     address facetAddress;
+     *     bytes4[] functionSelectors;
+     * }
+     * @notice Gets all facets and their selectors.
+     * @return facets_ Facet
+     */
+
     function facets() external view override returns (Facet[] memory facets_) {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         facets_ = new Facet[](ds.selectorCount);
+        // Prevent adding more Facetselectors than uint8:MAX
         uint8[] memory numFacetSelectors = new uint8[](ds.selectorCount);
         uint256 numFacets;
         uint256 selectorIndex;
+        // loop through function selectors
         for (uint256 slotIndex; selectorIndex < ds.selectorCount; slotIndex++) {
             bytes32 slot = ds.selectorSlots[slotIndex];
             for (
@@ -53,14 +66,22 @@ contract DiamondLoupeFacet is IDiamondLoupe, IERC165 {
         for (uint256 facetIndex; facetIndex < numFacets; facetIndex++) {
             uint256 numSelectors = numFacetSelectors[facetIndex];
             bytes4[] memory selectors = facets_[facetIndex].functionSelectors;
+            // setting the number of selectors
             assembly {
                 mstore(selectors, numSelectors)
             }
         }
+        // setting the number of facets
         assembly {
             mstore(facets_, numFacets)
         }
     }
+
+    /**
+     * @notice Gets all the function selectors supported by a specific facet.
+     * @param _facet The facet address.
+     * @return _facetFunctionSelectors The selectors associated with a facet address.
+     */
 
     function facetFunctionSelectors(address _facet)
         external
@@ -72,6 +93,7 @@ contract DiamondLoupeFacet is IDiamondLoupe, IERC165 {
         uint256 numSelectors;
         _facetFunctionSelectors = new bytes4[](ds.selectorCount);
         uint256 selectorIndex;
+        // loop through function selectors
         for (uint256 slotIndex; selectorIndex < ds.selectorCount; slotIndex++) {
             bytes32 slot = ds.selectorSlots[slotIndex];
             for (
@@ -91,10 +113,16 @@ contract DiamondLoupeFacet is IDiamondLoupe, IERC165 {
                 }
             }
         }
+        // Set the number of selectors in the array
         assembly {
             mstore(_facetFunctionSelectors, numSelectors)
         }
     }
+
+    /**
+     * @notice Get all the facet addresses used by a diamond.
+     * @return facetAddresses_
+     */
 
     function facetAddresses()
         external
@@ -106,6 +134,7 @@ contract DiamondLoupeFacet is IDiamondLoupe, IERC165 {
         facetAddresses_ = new address[](ds.selectorCount);
         uint256 numFacets;
         uint256 selectorIndex;
+        // loop through function selectors
         for (uint256 slotIndex; selectorIndex < ds.selectorCount; slotIndex++) {
             bytes32 slot = ds.selectorSlots[slotIndex];
             for (
@@ -134,10 +163,18 @@ contract DiamondLoupeFacet is IDiamondLoupe, IERC165 {
                 numFacets++;
             }
         }
+        // Set the number of facet addresses in the array
         assembly {
             mstore(facetAddresses_, numFacets)
         }
     }
+
+    /**
+     * @notice Gets the facet that supports the given selector.
+     * @dev If facet is not found return address(0).
+     * @param _functionSelector The function selector.
+     * @return facetAddress_ The facet address.
+     */
 
     function facetAddress(bytes4 _functionSelector)
         external
@@ -148,6 +185,12 @@ contract DiamondLoupeFacet is IDiamondLoupe, IERC165 {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         facetAddress_ = address(bytes20(ds.facets[_functionSelector]));
     }
+
+    /**
+     * @dev This implements ERC-165.
+     * @param _interfaceId The interface identifier, as specified in ERC-165
+     * @return `true` if the contract implements `interfaceID`, `false` otherwise
+     */
 
     function supportsInterface(bytes4 _interfaceId)
         external

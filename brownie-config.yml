@@ -1,0 +1,18 @@
+dotenv: .env
+networks:
+  mainnet:
+    verify: True
+    from_key: ${PRIVATE_KEY}
+  ganache-local:
+    verify: False
+    chainid: 1
+    from_key: "0x213a68786ab9c33c1ff48a4b05176e4001fbbbbf76baeebcdd17d278652193c8"
+    other_key: "0x4ec1f8867ccdf291fe359e6f1cc248d6891a8d67807d751bbb3d34f3bb1e120f"
+  rinkeby:
+    verify: False
+    from_key: ${PRIVATE_KEY}
+token:
+  name: "Token"
+  symbol: "TKN"
+  version: "0.0.1"
+  decimals: 6
