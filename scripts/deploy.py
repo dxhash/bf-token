@@ -60,8 +60,6 @@ def deploy_diamond():
     diamond_cut = interface.IDiamondCut(diamond.address)
     function_call = diamond_init.init.encode_input()
 
-    # print(f"Cut: {cut}")
-
     tx = diamond_cut.diamondCut(
         cut,
         diamond_init.address,
@@ -88,5 +86,4 @@ def deploy_diamond():
 
 
 def main():
-    # publish_source()
     deploy_diamond()

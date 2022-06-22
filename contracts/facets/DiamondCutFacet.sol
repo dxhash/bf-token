@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.15;
+
+/******************************************************************************\
+* Based on implementation of a diamond by Nick Mudge (https://twitter.com/mudgen)
+* EIP-2535 Diamond Standard: https://eips.ethereum.org/EIPS/eip-2535
+/******************************************************************************/
 
 import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 import {LibDiamond} from "../libraries/LibDiamond.sol";
@@ -13,6 +18,13 @@ contract DiamondCutFacet is IDiamondCut {
      * @param _calldata A function call, including function selector and arguments
      *                  _calldata is executed with delegatecall on _init
      */
+
+    // External function version of diamondCut
+    // This code is almost the same as the internal diamondCut,
+    // except it is using 'Facet[] calldata _diamondCut' instead of
+    // 'Facet[] memory _diamondCut'.
+    // The code is duplicated to prevent copying calldata to memory which
+    // causes an error for a two dimensional array.
 
     function diamondCut(
         FacetCut[] calldata _diamondCut,
@@ -47,7 +59,7 @@ contract DiamondCutFacet is IDiamondCut {
                 );
         }
         if (selectorCount != originalSelectorCount) {
-            ds.selectorCount = uint16(selectorCount);
+            ds.selectorCount = selectorCount;
         }
         // If last selector slot is not full
         // "selectorCount & 7" is a gas efficient modulo by eight "selectorCount % 8"

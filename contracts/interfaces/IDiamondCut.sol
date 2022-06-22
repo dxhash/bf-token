@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.15;
+
+/******************************************************************************\
+* Based on implementation of a diamond by Nick Mudge (https://twitter.com/mudgen)
+* EIP-2535 Diamond Standard: https://eips.ethereum.org/EIPS/eip-2535
+/******************************************************************************/
 
 interface IDiamondCut {
     enum FacetCutAction {

@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.15;
+
+/******************************************************************************\
+* Based on implementation of a diamond by Nick Mudge (https://twitter.com/mudgen)
+* EIP-2535 Diamond Standard: https://eips.ethereum.org/EIPS/eip-2535
+/******************************************************************************/
 
 import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 import {EIP712} from "./EIP712.sol";
@@ -18,7 +23,7 @@ library LibDiamond {
         mapping(uint256 => bytes32) selectorSlots;
         // The number of function selectors in selectorSlots
         // Prevent adding more selectors than uint16:MAX
-        uint16 selectorCount;
+        uint256 selectorCount;
         // Used to query if a contract implements an interface.
         // Used to implement ERC-165.
         mapping(bytes4 => bool) supportedInterfaces;
@@ -108,7 +113,7 @@ library LibDiamond {
             );
         }
         if (selectorCount != originalSelectorCount) {
-            ds.selectorCount = uint16(selectorCount);
+            ds.selectorCount = selectorCount;
         }
         // If last selector slot is not full
         // "selectorCount & 7" is a gas efficient modulo by eight "selectorCount % 8"
